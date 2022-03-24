@@ -123,9 +123,13 @@ public class Graph {
     Airport actual = sommet;
 
     while (true) {
+
+      // Si je trouve la distance la plus opti pour ma destination cible j'arrête tout
       if (etiquetteDefinitive.containsKey(cible)) {
         break;
       }
+
+
       for (Flight f : outputFlights.get(actual)) {
         Airport destination = f.getDestination();
 
