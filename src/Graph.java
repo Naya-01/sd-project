@@ -92,7 +92,6 @@ public class Graph {
 
     sommet.setDistance(0.0); // tjr set avant d'ajouter pour le tri
     etiquetteProvisoire.add(sommet);
-
     etiquetteDefinitve.put(sommet,0.0);
 
     Airport actual = sommet;
@@ -125,9 +124,9 @@ public class Graph {
         }else{
           // Si il le contient déjà on doit comparer les chemins et garder le plus petit
         }
-
-        etiquetteDefinitve.put(etiquetteProvisoire.first(),etiquetteProvisoire.first().getDistance());
       }
+      etiquetteDefinitve.put(etiquetteProvisoire.first(),etiquetteProvisoire.first().getDistance());
+      etiquetteProvisoire.remove(etiquetteProvisoire.first());
     }
 
 
