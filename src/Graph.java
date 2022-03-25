@@ -3,6 +3,7 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -47,7 +48,8 @@ public class Graph {
   }
 
 
-  public void calculerItineraireMinimisantNombreVol(String airport1, String airport2) {
+  public void calculerItineraireMinimisantNombreVol(String airport1, String airport2)
+      throws NoFlightException {
 
     //TODO Faut faire les bons print mtn
 
@@ -56,49 +58,51 @@ public class Graph {
     HashMap<Airport, Flight> previousAirport = rechercheBFS(airport1,
         airport2); // Vol dest -> Vol src
 
-    if (previousAirport.containsKey(dest)) { // back
-      int nbVols = 0;
-      Airport actual = dest;
-      do {
-        System.out.println(actual);
-        Flight x = previousAirport.get(actual);
-        if (x != null) {
-          actual = x.getSource();
-        } else {
-          break;
-        }
-        nbVols++;
-      } while (actual != null);
-      System.out.println("On a " + nbVols + " à parcourir");
-    } else {
-      // pas trouvé
-      System.out.println("J'ai pas trouvé");
+    ArrayList<Flight> retour = cheminRetour(previousAirport, dest);
+
+    System.out.println("On a un chemin de " + (retour.size()) + " vols");
+    for (Flight flight : retour) {
+      System.out.println(flight);
     }
 
   }
 
-  public void calculerItineraireMiniminantDistance(String airport1, String airport2) {
-    Airport sommet = iataToAiportMap.get(airport1);
-    Airport dest = iataToAiportMap.get(airport1);
-    HashMap<Airport,Flight> retour = new HashMap<>();
-    HashMap<Airport, Double> etiquetteDefinitive = rechercheDijkstra(retour,airport1, airport2);
-    System.out.println("J'ai un chemin de " + etiquetteDefinitive.get(dest) + " km");
-    Airport toPrint = dest;
+  private ArrayList<Flight> cheminRetour(HashMap<Airport, Flight> previousAirport, Airport dest)
+      throws NoFlightException {
+    ArrayList<Flight> airports = new ArrayList<>();
+    if (previousAirport.containsKey(dest)) { // back
+      Airport actual = dest;
+      do {
+        //System.out.println(actual);
+        Flight x = previousAirport.get(actual);
+        if (x != null) {
+          airports.add(x);
+          actual = x.getSource();
+        } else {
+          break;
+        }
+      } while (actual != null);
+    } else {
+      throw new NoFlightException("J'ai rien");
+    }
+    return airports;
+  }
 
+  public void calculerItineraireMiniminantDistance(String airport1, String airport2)
+      throws NoFlightException {
+    Airport dest = iataToAiportMap.get(airport2);
 
-
-    Flight volToPrint;
-    while(!toPrint.equals(sommet)){
-      volToPrint = retour.get(toPrint);
-      if(volToPrint==null)break;
-      System.out.println(volToPrint);
-      toPrint = volToPrint.getSource();
+    HashMap<Airport, Flight> retour =  rechercheDijkstra2(airport1, airport2);
+    System.out.println("J'ai un chemin de " + dest.getDistance() + " km");
+    ArrayList<Flight> airports = cheminRetour(retour, dest);
+    for (Flight flight : airports) {
+      System.out.println(flight);
     }
 
   }
 
   /**
-   * Méthode de lisibilité retournant la distance entre deux stations
+   * Méthode de lisibilité retournant la distance entre deux
    *
    * @param src  airport src
    * @param dest airport dest
@@ -109,59 +113,43 @@ public class Graph {
         dest.getLongitude());
   }
 
-  private HashMap<Airport, Double> rechercheDijkstra(HashMap<Airport,Flight> retour,String airport1, String airport2) {
-    HashMap<Airport, Double> etiquetteDefinitive = new HashMap<>();
-    TreeSet<Airport> etiquetteProvisoire = new TreeSet<>(
-        Comparator.comparing(Airport::getDistance).thenComparing(Airport::getIata));
-    HashMap<Airport, Double> cout = new HashMap<>();
+  private HashMap<Airport, Flight> rechercheDijkstra2(String airport1, String airport2) {
+    HashMap<Airport, Flight> retour = new HashMap<>();
+    HashSet<Airport> etiquetteDefinitive = new HashSet<>();
+    TreeSet<Airport> etiquetteProvisoire = new TreeSet<>(Comparator.comparing(Airport::getDistance).thenComparing(Airport::getIata));
 
     Airport sommet = iataToAiportMap.get(airport1);
-    sommet.setDistance(0.0);
     Airport cible = iataToAiportMap.get(airport2);
-    cout.put(sommet,0.0);
 
-    Airport actual = sommet;
-
-    while (true) {
-
-      // Si je trouve la distance la plus opti pour ma destination cible j'arrête tout
-      if (etiquetteDefinitive.containsKey(cible)) {
-        break;
-      }
-
+    sommet.setDistance(0.0);
+    etiquetteProvisoire.add(sommet);
+    while (!etiquetteDefinitive.contains(cible) && !etiquetteProvisoire.isEmpty()) {
+      Airport actual = etiquetteProvisoire.pollFirst();
+      etiquetteDefinitive.add(actual);
 
       for (Flight f : outputFlights.get(actual)) {
         Airport destination = f.getDestination();
+        double newDistance = actual.getDistance() + getDistance(actual, destination);
 
-        // Si déjà dans l'etiquette définitive on l'ajoute pas de nouveau
-        if(etiquetteDefinitive.containsKey(destination))continue;
-
-        // Si pas dans etiquette definitive
-        if (!etiquetteProvisoire.contains(destination)) {
-          double distance = cout.get(actual) + getDistance(actual, destination); // On calcule sa distance , si sommet cout.get(actuel) vaut 0 sinon il vaut tout les chemins d'avant
-          destination.setDistance(distance);
-          cout.put(destination, distance);
+        if (etiquetteDefinitive.contains(destination)) {
+          continue;
+        } else if (!etiquetteProvisoire.contains(destination)) {
+          destination.setDistance(newDistance);
           etiquetteProvisoire.add(destination);
           retour.put(destination, f);
         } else {
-          double distanceAvant = cout.get(destination);
-          double distanceMtn = cout.get(actual) + getDistance(actual, destination);
-          if (distanceMtn < distanceAvant) { // Je compare ma distance d'avant et ma distance que je viens de trouver
-            destination.setDistance(distanceMtn); // Si elle est plus petite je la set
-            cout.replace(destination, distanceMtn); // J'actualise ma table cout
-            etiquetteProvisoire.remove(destination); // J'actualise mon treemap
+          double distanceAvant = destination.getDistance();
+          if (newDistance < distanceAvant) {
+            etiquetteProvisoire.remove(destination);
+            destination.setDistance(newDistance);
             etiquetteProvisoire.add(destination);
-            retour.replace(destination, f); // J'actualise le chemin optimisé
+            retour.replace(destination, f);
           }
         }
       }
-
-      etiquetteDefinitive.put(etiquetteProvisoire.first(), etiquetteProvisoire.first().getDistance()); // Je met le plus petit dans l'etiquette definitive;
-      actual = etiquetteProvisoire.pollFirst();
-
     }
 
-    return etiquetteDefinitive;
+    return retour;
   }
 
   private HashMap<Airport, Flight> rechercheBFS(String airport1, String airport2) {
@@ -170,16 +158,16 @@ public class Graph {
 
     ArrayDeque<Airport> file = new ArrayDeque<>();
     HashSet<Airport> alreadySeen = new HashSet<>();
-    HashMap<Airport, Flight> previousAirport = new HashMap<>(); // Vol dest -> Vol src
+    HashMap<Airport, Flight> previousAirport = new HashMap<>();
     file.addLast(sommet);
     alreadySeen.add(sommet);
     while (!alreadySeen.contains(dest) && !file.isEmpty()) {
-      Airport actual = file.removeFirst(); // 1
-      for (Flight f : outputFlights.get(actual)) { // {1,2,3}
-        if (!alreadySeen.contains(f.getDestination())) { // 2
-          file.addLast(f.getDestination()); // {}
-          previousAirport.put(f.getDestination(), f); // [2,1],[4,1],[5,1],[3,2],[6,2]
-          alreadySeen.add(f.getDestination()); // 6 -> 2 -> 1 if(1==sommet)
+      Airport actual = file.removeFirst();
+      for (Flight f : outputFlights.get(actual)) {
+        if (!alreadySeen.contains(f.getDestination())) {
+          file.addLast(f.getDestination());
+          previousAirport.put(f.getDestination(), f);
+          alreadySeen.add(f.getDestination());
         }
       }
     }
